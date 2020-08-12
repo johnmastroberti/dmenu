@@ -37,8 +37,11 @@ struct item {
 
 static char text[BUFSIZ] = "";
 static char *embed;
-static int bh, mw, mh;
-static int inputw = 0, promptw;
+static int bh, // height of one line
+           mw, // menu width
+           mh; // total menu height
+static int inputw = 0,
+           promptw; // width of prompt text
 static int lrpad; /* sum of left and right padding */
 static size_t cursor;
 static struct item *items = NULL;
@@ -152,17 +155,18 @@ drawmenu(void)
 
 	if (prompt && *prompt) {
 		drw_setscheme(drw, scheme[SchemeSel]);
-		x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
+		drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
 	}
 	/* draw input field */
 	w = (lines > 0 || !matches) ? mw - x : inputw;
 	drw_setscheme(drw, scheme[SchemeNorm]);
-	drw_text(drw, x, 0, w, bh, lrpad / 2, text, 0);
+  int prompt_y = (lines>0 && prompt && *prompt) ? bh : 0;
+	drw_text(drw, x, prompt_y, w, bh, lrpad / 2, text, 0);
 
 	curpos = TEXTW(text) - TEXTW(&text[cursor]);
 	if ((curpos += lrpad / 2 - 1) < w) {
 		drw_setscheme(drw, scheme[SchemeNorm]);
-		drw_rect(drw, x + curpos, 2 + (bh-fh)/2, 2, fh - 4, 1, 0);
+		drw_rect(drw, x + curpos, 2 + (bh-fh)/2 + prompt_y, 2, fh - 4, 1, 0);
 	}
 
 	if (lines > 0) {
@@ -172,7 +176,7 @@ drawmenu(void)
 			drawitem(
 				item,
 				x + ((i / lines) *  ((mw - x) / columns)),
-				y + (((i % lines) + 1) * bh),
+				y + (((i % lines) + 1) * bh) + prompt_y,
 				(mw - x) / columns
 			);
 	} else if (matches) {
@@ -631,7 +635,10 @@ setup(void)
 	bh = drw->fonts->h + 2;
 	bh = MAX(bh,lineheight);	/* make a menu line AT LEAST 'lineheight' tall */
 	lines = MAX(lines, 0);
-	mh = (lines + 1) * bh;
+  if (lines)
+    mh = (prompt && *prompt) ? (lines + 2) * bh : (lines + 1) * bh;
+  else
+    mh = bh;
 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
 #ifdef XINERAMA
 	i = 0;
