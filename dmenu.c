@@ -24,7 +24,9 @@
 #define INTERSECT(x,y,w,h,r)  (MAX(0, MIN((x)+(w),(r).x_org+(r).width)  - MAX((x),(r).x_org)) \
                              * MAX(0, MIN((y)+(h),(r).y_org+(r).height) - MAX((y),(r).y_org)))
 #define LENGTH(X)             (sizeof X / sizeof X[0])
-#define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+int CHARWIDTH = 0;
+//#define TEXTW(X)              (drw_fontset_getwidth(drw, (X)) + lrpad)
+
 
 /* enums */
 enum { SchemeNorm, SchemeSel, SchemeOut, SchemeLast }; /* color schemes */
@@ -34,6 +36,7 @@ struct item {
 	struct item *left, *right;
 	int out;
 };
+
 
 static char text[BUFSIZ] = "";
 static char *embed;
@@ -57,6 +60,8 @@ static XIC xic;
 
 static Drw *drw;
 static Clr *scheme[SchemeLast];
+
+int TEXTW(const char* X) { return CHARWIDTH * strlen(X) + lrpad; }
 
 /* Temporary arrays to allow overriding xresources values */
 static char *colortemp[4];
@@ -102,8 +107,15 @@ static int
 max_textw(void)
 {
 	int len = 0;
-	for (struct item *item = items; item && item->text; item++)
+  int i = 0;
+  //print_items();
+	for (struct item *item = items; item && item->text; item++) {
 		len = MAX(TEXTW(item->text), len);
+    //printf("i = %d, len = %d\n", i, len);
+    i++;
+    //if (i > 100) break;
+  }
+  //printf("Computed max_textw\n");
 	return len;
 }
 
@@ -157,8 +169,9 @@ drawmenu(void)
 
 	if (prompt && *prompt) {
 		drw_setscheme(drw, scheme[SchemeSel]);
-		drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
+		x = drw_text(drw, x, 0, promptw, bh, lrpad / 2, prompt, 0);
 	}
+  if (lines > 0) x = 0;
 	/* draw input field */
 	w = (lines > 0 || !matches) ? mw - x : inputw;
 	drw_setscheme(drw, scheme[SchemeNorm]);
@@ -620,6 +633,9 @@ setup(void)
 {
 	int x, y, i, j;
 	unsigned int du;
+  // Get CHARWIDTH from drw
+  CHARWIDTH = drw_fontset_getwidth(drw, "A");
+  int passwd_len = TEXTW("This is a perfectly long and complicated password");
 	XSetWindowAttributes swa;
 	XIM xim;
 	Window w, dw, *dws;
@@ -677,7 +693,10 @@ setup(void)
 				if (INTERSECT(x, y, 1, 1, info[i]))
 					break;
 
-		mw = MIN(MAX(MAX(max_textw(), 100), promptw), info[i].width);
+    int maxwidth = max_textw();
+		mw = MIN(MAX(MAX(maxwidth, 100), promptw), info[i].width);
+    if (lines == 0)
+      mw += passwd_len;
 		x = info[i].x_org + ((info[i].width  - mw) / 2);
 		y = info[i].y_org + ((info[i].height - mh) / 2);
 		XFree(info);
@@ -687,7 +706,11 @@ setup(void)
 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
 			die("could not get embedding window attributes: 0x%lx",
 			    parentwin);
-		mw = MIN(MAX(max_textw() + promptw, 100), wa.width);
+    int maxwidth = max_textw();
+		mw = MIN(MAX(MAX(maxwidth, 100), promptw), wa.width);
+    if (lines == 0)
+      mw += passwd_len;
+		x = info[i].x_org + ((info[i].width  - mw) / 2);
 		x = (wa.width  - mw) / 2;
 		y = (wa.height - mh) / 2;
 	}
