@@ -1,3 +1,6 @@
 *.o
+*.orig
+*.rej
 dmenu
 stest
+tags
